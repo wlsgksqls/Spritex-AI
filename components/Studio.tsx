@@ -45,6 +45,7 @@ export function Studio() {
   const [sprite, setSprite] = useState<SpriteJobResult | null>(null);
   const [referenceName, setReferenceName] = useState<string | null>(null);
   const [referenceDataUrl, setReferenceDataUrl] = useState<string | undefined>();
+  const [gifBusy, setGifBusy] = useState(false);
 
   useEffect(() => {
     const stored =
@@ -140,6 +141,36 @@ export function Studio() {
       setError(err instanceof Error ? err.message : "생성 실패");
     } finally {
       setBusy(null);
+    }
+  };
+
+  const previewFrames = useMemo(() => {
+    if (!sprite) return [];
+    if (options.loop === "oneshot" && base) {
+      return [...sprite.frames, base.directions.front];
+    }
+    return sprite.frames;
+  }, [sprite, options.loop, base]);
+
+  const downloadGif = async () => {
+    if (!sprite || previewFrames.length === 0) return;
+    setError(null);
+    setGifBusy(true);
+    try {
+      const result = await postJson<{ gifDataUrl: string }>(
+        "/api/gif",
+        {
+          frames: previewFrames,
+          fps: options.fps,
+          loop: options.loop,
+        },
+        apiKey.trim(),
+      );
+      downloadDataUrl(result.gifDataUrl, "spritex-preview.gif");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "GIF 저장 실패");
+    } finally {
+      setGifBusy(false);
     }
   };
 
@@ -271,10 +302,10 @@ export function Studio() {
               <h3>미리보기</h3>
               {sprite ? (
                 <PreviewPlayer
-                  key={sprite.sheetDataUrl}
-                  frames={sprite.previewFrames}
-                  fps={sprite.fps}
-                  loop={sprite.loop}
+                  key={`${sprite.sheetDataUrl}-${options.loop}`}
+                  frames={previewFrames}
+                  fps={options.fps}
+                  loop={options.loop}
                   spriteSize={sprite.spriteSize}
                 />
               ) : (
@@ -294,10 +325,10 @@ export function Studio() {
             <button
               type="button"
               className="ghost"
-              disabled={!sprite}
-              onClick={() => sprite && downloadDataUrl(sprite.gifDataUrl, "spritex-preview.gif")}
+              disabled={!sprite || gifBusy}
+              onClick={() => void downloadGif()}
             >
-              GIF
+              {gifBusy ? "GIF 만드는 중…" : `GIF (${options.fps} FPS)`}
             </button>
             <button
               type="button"

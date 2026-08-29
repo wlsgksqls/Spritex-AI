@@ -186,11 +186,44 @@ button:disabled {
   padding: 16px;
 }
 
-.stack,
-.field {
+.stack {
   display: grid;
   gap: 12px;
   margin-top: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.field small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.timing-card {
+  background: #0c0f18;
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.timing-card p {
+  margin: 0 0 8px;
+}
+
+.timing-card p:last-child {
+  margin: 0;
+}
+
+.timing-line {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--accent);
 }
 
 .seg {
