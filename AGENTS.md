@@ -256,18 +256,18 @@ readable silhouette, limited palette, no photorealism, no 3D render
 
 | 용도 | 선택 | 이유 |
 | --- | --- | --- |
-| 프레임워크 | **Next.js (App Router) + TypeScript** | 프론트와 API를 한 레포. **Cloudflare Workers**에 OpenNext로 올린다 |
+| 프레임워크 | **Next.js (static export) + Cloudflare Worker** | 프론트는 Pages `out/`, API는 `worker/` |
 | 스타일 | **Tailwind CSS** | 컨트롤 많은 툴 UI를 빨리 짬 |
-| 검증 | **zod** | `/api` 바디 검증 |
+| 검증 | **zod** | Worker `/api` 바디 검증 |
 | 생성 API | **Gemini** (`@google/genai`, `gemini-2.5-flash-image`) | 텍스트/참고이미지 → 그리드 시트 |
-| 이미지 처리 | **pngjs** (순수 JS) | Workers에서 sharp 네이티브 바이너리를 못 씀. 크롭/합성/nearest resize/PNG |
-| GIF | **gifenc** | 서버에서 팔레트 GIF |
-| 배포 | **Cloudflare Workers** (`@opennextjs/cloudflare` + Wrangler) | Pages Functions가 아님. `wrangler.jsonc` + `open-next.config.ts` |
+| 이미지 처리 | **pngjs** (순수 JS) | Workers에서 sharp 네이티브 바이너리를 못 씀 |
+| GIF | **gifenc** | Worker에서 팔레트 GIF |
+| 배포 | **Pages (`spritex-ai`) + Worker (`spritex-ai-api`)** | 파일도 설정 파일도 분리. OpenNext 쓰지 않음 |
 | 상태 | 클라이언트는 React state. 전역이 필요하면 zustand 한 개 | v1에 DB 없음 |
 
 패키지 매니저: **pnpm** (없으면 npm도 허용). React 실험 컴파일러 같은 비필수 옵션은 켜지 마라.
 
-앱 루트는 저장소 루트다. `apps/` 모노레포로 쪼개지 마라.
+앱 루트는 저장소 루트다. 프론트는 루트 Next static export, API는 `worker/` 다. `apps/` 모노레포로 더 쪼개지 마라.
 
 ### Gemini
 
@@ -279,36 +279,38 @@ readable silhouette, limited palette, no photorealism, no 3D render
 2. 서버 환경변수 `GEMINI_API_KEY`
 3. 둘 다 없으면 **목 생성**. UI에 데모 모드를 표시한다. 앱을 멈추지 마라.
 
-사용자 키는 서버에 저장하지 않는다. 브라우저 localStorage/sessionStorage만 쓴다. 클라이언트 번들에 `NEXT_PUBLIC_` 키를 넣지 마라. 모든 Gemini 호출은 Route Handler에서만.
+사용자 키는 서버에 저장하지 않는다. 브라우저 localStorage/sessionStorage만 쓴다. 클라이언트 번들에 `NEXT_PUBLIC_` 키를 넣지 마라. 모든 Gemini 호출은 **Worker** (`lib/api.ts` + `worker/src/index.ts`)에서만.
 
 ### 환경 변수
 
-로컬 Next (`npm run dev`): `.env.local` (커밋 금지)
+로컬 프론트 `.env.local`:
+
+```
+NEXT_PUBLIC_API_BASE=http://127.0.0.1:8787
+```
+
+로컬 Worker `worker/.dev.vars`:
 
 ```
 GEMINI_API_KEY=...
+ALLOWED_ORIGINS=http://127.0.0.1:3000,http://localhost:3000
 ```
 
-Workers 로컬 프리뷰 (`npm run preview`): `.dev.vars` (커밋 금지, `.dev.vars.example` 복사)
+배포:
 
-```
-NEXTJS_ENV=development
-GEMINI_API_KEY=...
-```
+- **Worker Secret:** `GEMINI_API_KEY` (Pages가 아님. API가 Worker에 있음)
+- **Pages 빌드 변수:** `NEXT_PUBLIC_API_BASE=https://spritex-ai-api.<계정>.workers.dev` (공개 URL, 시크릿 아님)
 
-배포 시 `GEMINI_API_KEY`는 **GitHub 시크릿이 아니다.** Cloudflare Pages 프로젝트 `spritex-ai` → Settings → Variables and Secrets 에 Secret으로 넣는다. `wrangler.jsonc`의 `vars`에 적지 마라.
-
-프론트는 **Cloudflare Pages**다. OpenNext Worker를 `.open-next/_worker.js` 로 옮겨 Pages advanced mode로 올린다. 빌드 커맨드는 `npm run pages:build`, 출력 디렉터리는 `.open-next`. `functions/` 디렉터리는 만들지 마라.
-
-GitHub Actions는 `wrangler pages deploy` 로 같은 Pages 프로젝트에 올린다 (토큰이 있을 때만).
-
-- GitHub Actions secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
-- Cloudflare Pages 변수: `GEMINI_API_KEY` (Secret)
+`NEXT_PUBLIC_` 에 Gemini 키를 넣지 마라.
 
 ### 호스트 / 런타임
 
-- 배포 타깃은 **Cloudflare Pages** (`spritex-ai.pages.dev`). Next.js App Router + API라 정적 HTML만 올리면 404다. OpenNext + `_worker.js` 로 올린다.
-- **Pages `functions/` 디렉터리를 만들지 마라.** `_worker.js` advanced mode와 충돌한다.
+- Pages: 정적 `out/` (`next build` + `output: "export"`). `app/api` 없음.
+- Worker: `worker/wrangler.jsonc`, 엔트리 `worker/src/index.ts`. Git 연결 시 이 설정 파일을 가리킨다.
+- **Pages `functions/` 와 `_worker.js` 를 만들지 마라.** 프론트는 순수 정적, API는 별도 Worker.
+- **sharp 금지.** PNG는 `lib/png.ts`.
+- 로컬: `npm run dev` + `npm run dev:worker`.
+- Workers CPU 한도(유료 약 30초)에 Gemini가 걸리면 타임아웃. 목 경로는 유지.
 - `export const runtime = "edge"` 금지. OpenNext Cloudflare는 edge runtime을 지원하지 않는다. nodejs가 기본이다.
 - **sharp 금지.** Workers에 네이티브 바이너리가 없다. PNG 처리는 `lib/png.ts` (`pngjs`)만 쓴다.
 - 로컬 개발은 계속 `npm run dev` (Node). Worker 런타임에 가까운 확인은 `npm run preview`.
@@ -323,48 +325,26 @@ GitHub Actions는 `wrangler pages deploy` 로 같은 Pages 프로젝트에 올�
 
 ```
 /
-  AGENTS.md                 ← 이 파일
+  AGENTS.md
   README.md
-  LICENSE
   package.json
-  next.config.ts            ← initOpenNextCloudflareForDev()
-  open-next.config.ts       ← defineCloudflareConfig
-  wrangler.jsonc            ← Worker 이름, nodejs_compat, ASSETS (로컬 preview)
-  wrangler.pages.jsonc      ← Pages 배포 (pages_build_output_dir)
-  scripts/prepare-cloudflare-pages.mjs  ← worker.js → _worker.js + assets
-  cloudflare-env.d.ts       ← wrangler types (cf-typegen)
-  .github/workflows/cloudflare.yml  ← Pages에 wrangler pages deploy
-  tsconfig.json
-  .env.example              ← GEMINI_API_KEY
-  .dev.vars.example         ← NEXTJS_ENV + GEMINI_API_KEY (Workers 프리뷰)
-  .gitignore                ← .open-next, .wrangler, .dev.vars
-  app/
-    layout.tsx
-    page.tsx                ← 스튜디오 UI
-    globals.css
-    api/
-      character/route.ts    ← 단계 1
-      sprite/route.ts       ← 단계 2
-      gif/route.ts          ← 미리보기 GIF 재인코딩
-      config/route.ts       ← 서버 키 유무
+  next.config.ts            ← output: "export" (Pages)
+  wrangler.jsonc            ← Pages: pages_build_output_dir = out
+  worker/
+    wrangler.jsonc          ← Worker: spritex-ai-api
+    src/index.ts            ← fetch 라우터 + CORS
+    .dev.vars.example
+  app/                      ← 스튜디오 UI만. api/ 없음
   components/
-    Studio.tsx
-    OptionPanel.tsx
-    PreviewPlayer.tsx
-    SheetViewer.tsx
   lib/
-    types.ts                ← 아래 타입을 그대로 둬라
-    prompts.ts              ← 모델 프롬프트 조립
-    gemini.ts               ← Gemini 이미지 생성 래퍼
-    png.ts                  ← pngjs decode/encode/resize/composite
-    sheet.ts                ← 크롭 / 리사이즈 / inplace / 합성
-    gif.ts                  ← gifenc
-    mock.ts                 ← 키 없을 때 픽셀 캐릭터 프레임
-  public/
-    _headers                ← /_next/static 캐시
+    api.ts                  ← character/sprite/gif/config 핸들러
+    apiUrl.ts               ← NEXT_PUBLIC_API_BASE
+    keys.ts
+    png.ts / sheet.ts / gif.ts / gemini.ts ...
+  public/_headers
 ```
 
-인증, Prisma, Supabase, 업로드 스토리지는 v1에 넣지 않는다. 생성 결과는 메모리/data URL로 클라이언트에 내려주고, 브라우저가 PNG/GIF를 다운로드한다. R2는 아직 쓰지 않는다.
+인증, Prisma, Supabase, 업로드 스토리지는 v1에 넣지 않는다. 생성 결과는 data URL로 클라이언트에 내려주고, 브라우저가 PNG/GIF를 다운로드한다. R2는 아직 쓰지 않는다.
 
 ---
 

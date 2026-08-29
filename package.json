@@ -4,20 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 --port 3000",
+    "dev:worker": "wrangler dev --config worker/wrangler.jsonc --port 8787",
     "build": "next build",
-    "start": "next start",
-    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "pages:build": "opennextjs-cloudflare build && node scripts/prepare-cloudflare-pages.mjs",
-    "pages:deploy": "npm run pages:build && wrangler pages deploy .open-next --project-name=spritex-ai -c wrangler.pages.jsonc",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy -- --keep-vars",
-    "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload -- --keep-vars",
-    "cf-typegen": "wrangler types --env-interface CloudflareEnv --include-runtime false cloudflare-env.d.ts",
+    "deploy:pages": "next build && wrangler pages deploy out --project-name=spritex-ai",
+    "deploy:worker": "wrangler deploy --config worker/wrangler.jsonc",
     "lint": "eslint",
     "test": "tsx --test lib/sheet.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",
-    "@opennextjs/cloudflare": "^1.20.4",
     "gifenc": "^1.0.3",
     "next": "16.3.3",
     "pngjs": "^7.0.0",

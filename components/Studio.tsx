@@ -5,6 +5,7 @@ import { MotionOptions, OptionPanel } from "@/components/OptionPanel";
 import { PreviewPlayer } from "@/components/PreviewPlayer";
 import { SheetViewer } from "@/components/SheetViewer";
 import type { BaseCharacter, SpriteJobResult, StudioOptions } from "@/lib/types";
+import { apiUrl } from "@/lib/apiUrl";
 import { DEFAULT_OPTIONS, DIRECTIONS } from "@/lib/types";
 
 type Config = { hasServerKey: boolean; model: string };
@@ -80,7 +81,7 @@ export function Studio() {
   useEffect(() => {
     const stored =
       window.localStorage.getItem(KEY_STORAGE) || window.sessionStorage.getItem(KEY_STORAGE) || "";
-    fetch("/api/config")
+    fetch(apiUrl("/api/config"))
       .then((res) => res.json())
       .then((data: Config) => {
         setConfig(data);
@@ -126,7 +127,7 @@ export function Studio() {
     try {
       persistKey(apiKey.trim(), rememberKey);
       const result = await postJson<BaseCharacter>(
-        "/api/character",
+        apiUrl("/api/character"),
         {
           spriteSize: options.spriteSize,
           view: options.view,
@@ -152,7 +153,7 @@ export function Studio() {
     try {
       persistKey(apiKey.trim(), rememberKey);
       const result = await postJson<SpriteJobResult>(
-        "/api/sprite",
+        apiUrl("/api/sprite"),
         {
           spriteSize: options.spriteSize,
           view: options.view,
@@ -188,7 +189,7 @@ export function Studio() {
     setGifBusy(true);
     try {
       const result = await postJson<{ gifDataUrl: string }>(
-        "/api/gif",
+        apiUrl("/api/gif"),
         {
           frames: previewFrames,
           fps: options.fps,

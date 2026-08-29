@@ -162,61 +162,58 @@ Spritex AI는 이 과정을 **규격 지정 → 캐릭터 기본 모습 확정 �
 
 ## 로컬 실행
 
+프론트(Pages용)와 API(Worker)를 따로 띄웁니다.
+
 ```bash
 npm install
-cp .env.example .env.local   # 선택. GEMINI_API_KEY=...
-npm run dev
+cp .env.example .env.local
+cp worker/.dev.vars.example worker/.dev.vars   # GEMINI_API_KEY 는 여기
+npm run dev:worker    # http://127.0.0.1:8787
+npm run dev           # http://127.0.0.1:3000  (.env.local 의 NEXT_PUBLIC_API_BASE)
 ```
 
-브라우저에서 `http://127.0.0.1:3000` 을 엽니다. 테스트는 `npm test` 입니다.
+`.env.local` 의 `NEXT_PUBLIC_API_BASE=http://127.0.0.1:8787` 이어야 스튜디오가 Worker API를 칩니다. 테스트는 `npm test` 입니다.
 
-## Cloudflare Pages에 올리기
+## Cloudflare: Pages(프론트) + Worker(API)
 
-프론트엔드와 생성 API는 같은 Cloudflare Pages 앱(`spritex-ai`)으로 올립니다. Next.js API가 있어서 정적 HTML만 올리면 빈 404가 납니다. OpenNext로 Worker를 만든 뒤 Pages advanced mode(`_worker.js`)로 붙입니다.
+같은 GitHub 레포에 **파일이 이미 나뉘어 있습니다.** 대시보드에서 Worker를 만들고 이 레포를 연결하면 됩니다.
 
-`GEMINI_API_KEY` 는 GitHub에 넣지 말고 **Pages 환경 변수**로만 둡니다.
+| | Pages (프론트) | Worker (API) |
+| --- | --- | --- |
+| 폴더 | 저장소 루트 (`app/`, `components/`, `out/`) | `worker/` |
+| 설정 파일 | `wrangler.jsonc` (`pages_build_output_dir: out`) | `worker/wrangler.jsonc` |
+| 프로젝트 이름 | `spritex-ai` | `spritex-ai-api` |
+| 빌드 | `npm run build` → `out/` | Wrangler가 `worker/src/index.ts` 번들 |
 
-### 1. Pages 프로젝트 빌드 설정 (지금 404가 나는 이유)
+### 1. Worker 만들기 (GitHub 연결)
 
-[Workers & Pages](https://dash.cloudflare.com) → `spritex-ai` → **Settings** → **Builds & deployments**
+1. Workers & Pages → **Create** → Worker → **Connect to Git** → `Spritex-AI`
+2. Wrangler config: `worker/wrangler.jsonc` (또는 Root directory `worker`)
+3. Worker name: `spritex-ai-api`
+4. **Settings → Variables and Secrets** 에 `GEMINI_API_KEY` (Secret)
+
+배포 후 URL 예: `https://spritex-ai-api.<계정>.workers.dev`
+
+### 2. Pages 프론트
+
+기존 `spritex-ai` Pages 프로젝트:
 
 | 항목 | 값 |
 | --- | --- |
-| Framework preset | **None** |
-| Build command | `npm run pages:build` |
-| Build output directory | `.open-next` |
-| Root directory | `/` |
-| Node version | `22` |
+| Framework preset | **None** (또는 Next.js static) |
+| Build command | `npm run build` |
+| Build output directory | `out` |
+| Node | `22` |
 
-이 값이 맞아야 PR 프리뷰(`*.spritex-ai.pages.dev`)가 스튜디오를 보여 줍니다.
+**Settings → Environment variables** (빌드 변수, 시크릿 아님):
 
-### 2. Gemini 키 — Pages 변수
-
-같은 프로젝트 → **Settings** → **Variables and Secrets** (Environment variables)
-
-| 이름 | 타입 | 환경 |
-| --- | --- | --- |
-| `GEMINI_API_KEY` | **Secret** | Production + Preview |
-
-저장 후 스튜디오는 서버 키로 생성합니다. 헤더에 붙인 키가 있으면 그게 우선합니다.
-
-### 3. GitHub Actions Direct Upload (선택)
-
-`.github/workflows/cloudflare.yml` 은 `wrangler pages deploy` 로 같은 Pages 프로젝트에 올립니다. Pages Git 빌드가 예전 wrangler로 `_worker.js` 를 깨뜨릴 때를 대비한 경로입니다. **Pages Git과 둘 다 켜면 배포가 두 번** 됩니다.
-
-GitHub **Settings → Secrets and variables → Actions** (Gemini 키는 넣지 마세요):
-
-| GitHub secret | 용도 |
+| 이름 | 값 |
 | --- | --- |
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API 토큰 (Pages 배포) |
-| `CLOUDFLARE_ACCOUNT_ID` | 계정 ID |
+| `NEXT_PUBLIC_API_BASE` | Worker URL (`https://spritex-ai-api.<계정>.workers.dev`) |
 
-로컬에서:
+Gemini 키는 Pages에 넣지 마세요. API가 Worker에 있습니다.
 
-```bash
-npm run pages:build
-npx wrangler pages deploy .open-next --project-name=spritex-ai -c wrangler.pages.jsonc
-```
+Worker에서 Pages 오리진 CORS는 `spritex-ai.pages.dev` 와 `*.spritex-ai.pages.dev` 를 허용합니다. 다른 도메인이면 Worker 변수 `ALLOWED_ORIGINS` 에 콤마로 추가합니다.
 
 ## 라이선스
 

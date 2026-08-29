@@ -1,4 +1,4 @@
-name: Cloudflare
+name: CI
 
 on:
   push:
@@ -7,13 +7,13 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: cloudflare-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,42 +24,7 @@ jobs:
       - run: npm test
       - run: npm run lint
       - run: npx tsc --noEmit
-
-  deploy:
-    needs: test
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    permissions:
-      contents: read
-      deployments: write
-    steps:
-      - name: Require Cloudflare token
+      - name: Build Pages static export
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "CLOUDFLARE_API_TOKEN is not set. Skipping Pages Direct Upload."
-            echo "Set GitHub secrets, or in the Pages project use build command: npm run pages:build and output: .open-next"
-            exit 0
-          fi
-          echo "has_token=true" >> "$GITHUB_ENV"
-      - uses: actions/checkout@v4
-        if: env.has_token == 'true'
-      - uses: actions/setup-node@v4
-        if: env.has_token == 'true'
-        with:
-          node-version: 22
-          cache: npm
-      - if: env.has_token == 'true'
-        run: npm ci
-      - name: Build OpenNext for Cloudflare Pages
-        if: env.has_token == 'true'
-        run: npm run pages:build
-      - name: Deploy to Cloudflare Pages
-        if: env.has_token == 'true'
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy .open-next --project-name=spritex-ai -c wrangler.pages.jsonc
+          NEXT_PUBLIC_API_BASE: https://spritex-ai-api.workers.dev
+        run: npm run build

@@ -1,24 +1,17 @@
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+export type GeminiEnv = { GEMINI_API_KEY?: string };
 
 function headerGeminiKey(request: Request): string | null {
   return request.headers.get("x-gemini-api-key")?.trim() || null;
 }
 
-async function envGeminiKey(): Promise<string | null> {
-  const fromProcess = process.env.GEMINI_API_KEY?.trim();
-  if (fromProcess) return fromProcess;
-  try {
-    const { env } = await getCloudflareContext({ async: true });
-    return env.GEMINI_API_KEY?.trim() || null;
-  } catch {
-    return null;
-  }
+function envGeminiKey(env?: GeminiEnv): string | null {
+  return env?.GEMINI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim() || null;
 }
 
-export async function resolveGeminiApiKey(request: Request): Promise<string | null> {
-  return headerGeminiKey(request) || (await envGeminiKey());
+export function resolveGeminiApiKey(request: Request, env?: GeminiEnv): string | null {
+  return headerGeminiKey(request) || envGeminiKey(env);
 }
 
-export async function hasServerGeminiKey(): Promise<boolean> {
-  return Boolean(await envGeminiKey());
+export function hasServerGeminiKey(env?: GeminiEnv): boolean {
+  return Boolean(envGeminiKey(env));
 }
