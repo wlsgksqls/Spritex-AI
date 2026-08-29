@@ -12,15 +12,16 @@
 
 저장소: `https://github.com/wlsgksqls/Spritex-AI` (public, MIT)
 
-현재 구현 코드는 **없다**. 있는 파일:
+프로토타입 앱이 있다. Next.js 스튜디오 + Gemini 이미지 생성 + 시트 후처리.
 
 | 파일 | 역할 |
 | --- | --- |
 | `README.md` | 서비스 소개 (기획 설명, 사용자용) |
 | `LICENSE` | MIT |
 | `AGENTS.md` | 이 파일. 구현용 스펙 / 핸드오프 |
+| `app/`, `components/`, `lib/` | 프로토타입 소스 |
 
-다음 세션의 첫 작업은 README를 고치는 것이 아니다. **앱 스캐폴드부터** 시작한다.
+다음 세션은 스캐폴드를 다시 하지 말고, 이 코드를 읽고 품질·실생성 쪽을 다듬는다.
 
 ---
 
@@ -152,10 +153,10 @@ Inplace:
 서버가 모델용 프롬프트 조립 (시점/프레임 수/그리드/Inplace/픽셀아트 지시)
         │
         ▼
-fal.ai 이미지 생성 또는 edit (참고 이미지 URL 포함)
+Gemini 이미지 생성/편집 (`gemini-2.5-flash-image`, 흰 배경 그리드)
         │
         ▼
-fal.ai BRIA 배경 제거 (투명 PNG)
+코너 플러드필로 배경 제거 (투명 PNG)
         │
         ▼
 그리드를 균등 분할해 프레임 추출
@@ -175,24 +176,21 @@ inplace=true 이면 발(하단 중심)을 칸의 같은 좌표로 정렬
 
 ### 3.1 단계 1 생성
 
-1. 업로드가 없으면 `fal-ai/nano-banana-pro`로 **정면 idle 전신 1장**을 만든다. 흰 배경, 캐릭터만, 픽셀 아트, 머리부터 발끝까지.
-2. 그 1장(또는 업로드)을 `fal-ai/nano-banana-pro/edit`에 넣고 **2x2 그리드**를 요청한다.
-   - 칸 배치를 프롬프트에 고정한다: 좌상=front, 우상=right, 좌하=back, 우하=left.
-   - 같은 캐릭터, 같은 팔레트, 같은 실루엣, 포즈만 방향이 바뀜.
-3. BRIA로 배경 제거.
-4. 2x2를 4등분 → 각 셀 contain + nearest로 `spriteSize`에 맞추고 투명 캔버스 중앙(발은 하단 근처)에 올린다.
-
-대안(품질이 구리면 교체): fal Flux.2 Klein 4B + [spritesheet LoRA](https://huggingface.co/fal/flux-2-klein-4b-spritesheet-lora) 엔드포인트 `fal-ai/flux-2-klein/4b/base/edit/lora`. 이 LoRA는 원래 사물 2x2용이고 빨간 배경이 나온다. 캐릭터 픽셀아트의 1순위가 아니다. **1순위는 nano-banana-pro/edit.**
+1. 프로토타입은 호출을 한 번으로 줄였다. Gemini `gemini-2.5-flash-image`에 2x2 턴어라운드를 바로 요청한다.
+2. 업로드가 있으면 `inlineData`로 같이 보낸다.
+3. 칸 배치: 좌상=front, 우상=right, 좌하=back, 우하=left.
+4. 코너 플러드필로 흰(또는 코너와 비슷한) 배경을 지운다.
+5. 2x2를 4등분 → 각 셀 contain + nearest로 `spriteSize`에 맞추고 발은 칸 하단에 둔다.
 
 ### 3.2 단계 2 생성
 
-1. 참고 이미지 URL: 최소 정면 1장, 가능하면 4장 모두 `image_urls`에 넣는다.
-2. `fal-ai/nano-banana-pro/edit`로 **N프레임 그리드 시트**를 요청한다.
+1. 참고 이미지: 4방향 PNG를 Gemini `contents`에 `inlineData`로 넣는다.
+2. `gemini-2.5-flash-image`로 **N프레임 그리드 시트**를 요청한다.
    - `frameCount` 4 → 2x2
    - 5–8 → 4x2 (빈 칸이 생기면 프롬프트에 “마지막 칸은 비우지 말고 프레임을 채워라” 또는 실제 쓰는 칸만 자르기)
    - 9–16 → 4x4
 3. 그리드 읽는 순서는 **행 우선, 왼쪽→오른쪽, 위→아래**. 이게 재생 순서다.
-4. BRIA 배경 제거.
+4. 코너 플러드필로 배경 제거.
 5. 균등 그리드 크롭. (v1은 콘텐츠 인식 슬라이싱 없음. 모델이 칸을 살짝 삐뚤어도 균등 분할한다.)
 6. 리사이즈 + (옵션) inplace 정렬 + 1행 시트로 재합성.
 
@@ -260,7 +258,7 @@ readable silhouette, limited palette, no photorealism, no 3D render
 | 프레임워크 | **Next.js (App Router) + TypeScript** | 프론트와 API를 한 레포, Vercel 배포 쉬움 |
 | 스타일 | **Tailwind CSS** | 컨트롤 많은 툴 UI를 빨리 짬 |
 | 검증 | **zod** | `/api` 바디 검증 |
-| 생성 API | **fal.ai** (`@fal-ai/serverless-client` 또는 `@fal-ai/client`) | 이미지 생성·edit·배경제거를 키 하나로 |
+| 생성 API | **Gemini** (`@google/genai`, `gemini-2.5-flash-image`) | 텍스트/참고이미지 → 그리드 시트 |
 | 이미지 처리 | **sharp** | 크롭, 합성, nearest resize, PNG |
 | GIF | **gifenc** | 서버에서 팔레트 GIF |
 | 상태 | 클라이언트는 React state. 전역이 필요하면 zustand 한 개 | v1에 DB 없음 |
@@ -269,32 +267,25 @@ readable silhouette, limited palette, no photorealism, no 3D render
 
 앱 루트는 저장소 루트다. `apps/` 모노레포로 쪼개지 마라.
 
-### fal 모델 (1순위)
+### Gemini
 
-| 단계 | 엔드포인트 | 역할 |
-| --- | --- | --- |
-| 캐릭터 텍스트→이미지 | `fal-ai/nano-banana-pro` | 기본 정면 캐릭터 |
-| 참고 이미지→시트 | `fal-ai/nano-banana-pro/edit` | 4방향, 모션 그리드. `image_urls` + prompt |
-| 배경 제거 | `fal-ai/bria/background/remove` | 시트/캐릭터 투명화. 큐 없이 동기 |
+모델: `gemini-2.5-flash-image` (Nano Banana). 품질을 올리면 `gemini-3-pro-image-preview`로 바꿀 수 있다.
 
-폴백 (nano가 죽거나 사용자가 싸게 원할 때):
+키 우선순위:
 
-- `openai/gpt-image-2`
-- `openai/gpt-image-2/edit`
+1. 요청 헤더 `x-gemini-api-key` (스튜디오에 사용자가 붙인 키)
+2. 서버 환경변수 `GEMINI_API_KEY`
+3. 둘 다 없으면 **목 생성**. UI에 데모 모드를 표시한다. 앱을 멈추지 마라.
 
-gpt 쪽 walk/측면은 방향을 프롬프트에 아주 구체적으로 써야 한다. 기본 경로는 nano.
-
-**모든 fal 호출은 서버에서만.** `FAL_KEY`를 브라우저에 넣지 마라.
+사용자 키는 서버에 저장하지 않는다. 브라우저 localStorage/sessionStorage만 쓴다. 클라이언트 번들에 `NEXT_PUBLIC_` 키를 넣지 마라. 모든 Gemini 호출은 Route Handler에서만.
 
 ### 환경 변수
 
 `.env.local` (커밋 금지):
 
 ```
-FAL_KEY=...
+GEMINI_API_KEY=...
 ```
-
-키가 없으면 UI와 합성/미리보기/GIF는 목 프레임으로 개발하고, 생성 버튼은 명확한 에러를 보여 준다. 키가 없다고 프로젝트를 멈추지 마라.
 
 ### 호스트 / 런타임
 
@@ -333,7 +324,7 @@ FAL_KEY=...
   lib/
     types.ts                ← 아래 타입을 그대로 둬라
     prompts.ts              ← 모델 프롬프트 조립
-    fal.ts                  ← fal 클라이언트 래퍼
+    gemini.ts               ← Gemini 이미지 생성 래퍼
     sheet.ts                ← 크롭 / 리사이즈 / inplace / 합성
     gif.ts                  ← gifenc
     mock.ts                 ← FAL_KEY 없을 때 체커보드 프레임
@@ -401,7 +392,7 @@ API는 JSON으로 data URL 또는 짧은 수명의 fal CDN URL을 반환해도 �
 2. `PreviewPlayer` + 정수 배율 픽셀 캔버스. looping / oneshot / fps가 목 프레임에서 동작.
 3. `lib/sheet.ts`: 그리드 슬라이스, nearest resize, inplace, 1행 합성. 단위 테스트 또는 스크립트로 색 사각형 시트를 넣어 검증.
 4. `lib/gif.ts`: 같은 목 프레임으로 GIF 다운로드.
-5. `.env.example` + `lib/fal.ts`. 키 없으면 생성 API가 400과 안내 메시지.
+5. `.env.example` + `lib/gemini.ts`. 키 없으면 목 생성 + 데모 배너.
 6. `POST /api/character` 단계 1 실생성.
 7. `POST /api/sprite` 단계 2 실생성. 참고 이미지 필수.
 8. 로딩/에러/재생성. 단계 2는 단계 1 없이 비활성.
@@ -417,12 +408,12 @@ API는 JSON으로 data URL 또는 짧은 수명의 fal CDN URL을 반환해도 �
 2. **미리보기 스케일은 정수배.** `imageSmoothingEnabled = false` + `image-rendering: pixelated`.
 3. **시트 레이아웃은 우리가 다시 만든다.** 모델이 준 2x2/4x2 이미지는 중간 산물이다. 엔진용 최종본은 항상 `frameCount * spriteSize` 가로 1줄 PNG.
 4. **캐릭터 일관성.** 모션만 单独 생성하면 머리/옷이 매 프레임 바뀐다. 반드시 단계 1 이미지를 `image_urls`로 넣는다. 시드/스타일만 믿고 텍스트만 보내지 마라.
-5. **배경.** 게임 스프라이트는 투명이 기본이다. BRIA를 거치지 않은 RGB JPEG를 시트로 쓰지 마라.
+5. **배경.** 게임 스프라이트는 투명이 기본이다. Gemini 결과의 흰 배경은 후처리로 지운다.
 6. **Inplace는 모델에게만 맡기지 마라.** 프롬프트에 적더라도 후처리로 발을 맞춘다. Off일 때만 후처리를 끈다.
 7. **One-shot idle.** 미리보기가 모션 끝에 빈 화면이 되면 실패다. 단계 1 `front`를 같은 `spriteSize`로 맞춰 마지막에 붙인다.
-8. **API 키.** `FAL_KEY`는 서버 전용. 클라이언트 번들/NEXT_PUBLIC_ 금지.
-9. **비용/시간.** 단계 1은 생성 2회(정면 + 4방향), 단계 2는 1회 + BRIA. 버튼을 연타하지 못하게 in-flight 락을 건다. 결과를 받기 전에 같은 요청을 다시 보내지 마라.
-10. **콘텐츠.** 아동 성착취, 실존 인물 딥페이크, 노골적 CSAM 요청은 거부. fal 쪽 세이프티에만 맡기지 말고 서버에서 명백한 불법 요청은 400.
+8. **API 키.** 서버 `GEMINI_API_KEY` 또는 사용자가 입력한 키. 클라이언트 번들/`NEXT_PUBLIC_` 금지. 사용자 키는 헤더로만 전달.
+9. **비용/시간.** 프로토타입은 단계당 Gemini 1회. 버튼을 연타하지 못하게 in-flight 락을 건다.
+10. **콘텐츠.** 아동 성착취 등 명백한 불법 요청은 서버에서 400. Gemini 세이프티에만 맡기지 마라.
 11. **라이선스.** 사용자 프롬프트로 나온 픽셀은 프로토타입용이라고 README에 이미 적혀 있다. 타사 상용 캐릭터 IP를 참고 이미지로 넣으라고 유도하는 카피를 쓰지 마라.
 12. **v1에 넣지 말 것:** 로그인, 결제, 커뮤니티 갤러리, 동영상 내보내기, Unity 패키지, 자체 GPU, 커스텀 LoRA 학습, 맵/타일셋/배경 패럴랙스. 캐릭터 시트만.
 13. **테스트 없이 UI만 올리지 마라.** 브라우저가 있으면 생성 목 경로라도 미리보기 재생·PNG/GIF 다운로드를 직접 눌러 봐라.
@@ -489,7 +480,7 @@ Keep identity identical to the reference images.
 - [ ] 크기/시점/프레임/FPS/Inplace/루프/프롬프트 UI가 있다
 - [ ] 목 프레임으로 미리보기가 루프/원샷대로 돈다
 - [ ] 목 시트를 PNG로 받고, GIF로 받는다
-- [ ] FAL_KEY가 있으면 단계 1 → 단계 2 실생성
+- [ ] GEMINI_API_KEY 또는 사용자 키가 있으면 단계 1 → 단계 2 실생성
 - [ ] 최종 시트 칸 크기가 선택한 16/32/64와 정확히 같다
 
 막히면 이 파일을 다시 읽고, README의 제품 언어와 모순되지 않게 짜라. 제품 결정을 뒤집지 마라 (예: 크기를 128로 늘리기, 단계를 한 방에 합치기, 3D 모델 출력).
@@ -501,4 +492,4 @@ Keep identity identical to the reference images.
 - 사용자 이름: 동균
 - GitHub: wlsgksqls
 - 선호: 코드로 바로 만들고 디버깅. 장황한 재기획보다 동작하는 스튜디오.
-- 이전 세션: README 소개만 작성·머지함. 구현은 아직 없음.
+- 이전 세션: README + AGENTS.md 작성 후 프로토타입 스튜디오(Gemini, 사용자 키 입력)를 붙임.

@@ -1,0 +1,280 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #07080f;
+  --bg-2: #10131c;
+  --panel: #161a27;
+  --line: #2c3146;
+  --ink: #efeef8;
+  --muted: #8d93ad;
+  --accent: #7dffb3;
+  --accent-dim: #1f3d32;
+  --warn: #ffc14d;
+  --danger: #ff6b86;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 500px at 10% -10%, #1a1030 0%, transparent 50%),
+    linear-gradient(180deg, var(--bg), #05060b);
+  font-family: var(--font-sans), "Noto Sans KR", system-ui, sans-serif;
+}
+
+.studio {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 28px 0 64px;
+}
+
+.topbar {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 24px;
+  align-items: end;
+  margin-bottom: 20px;
+}
+
+.kicker {
+  margin: 0 0 4px;
+  color: var(--accent);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 40px;
+  letter-spacing: -0.04em;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+h3 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.keybox {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.keybox label span,
+.field span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+input[type="password"],
+input[type="text"],
+textarea,
+input[type="file"] {
+  width: 100%;
+  background: #0c0f18;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.remember {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.key-status {
+  margin: 0;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.steps {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.steps button,
+.ghost,
+.primary,
+.seg button {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  padding: 8px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.steps button.step-on,
+.seg-on,
+.primary {
+  background: var(--accent);
+  color: #062014;
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.banner {
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.banner.error {
+  background: #3a1018;
+  color: #ffd0d8;
+}
+
+.banner.warn {
+  background: #3a2e10;
+  color: #ffe7b0;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 18px;
+}
+
+.panel,
+.stage,
+.sheet-block {
+  background: color-mix(in srgb, var(--panel) 92%, black);
+  border: 1px solid var(--line);
+  padding: 16px;
+}
+
+.stack,
+.field {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.seg button {
+  flex: 1;
+  min-width: 72px;
+}
+
+.primary {
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px;
+}
+
+.stage {
+  display: grid;
+  gap: 16px;
+}
+
+.stage-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 12px;
+}
+
+.sheet-frame,
+.preview-stage,
+.sheet-empty {
+  margin-top: 10px;
+  background:
+    linear-gradient(45deg, #1b2030 25%, transparent 25%) -8px 0 / 16px 16px,
+    linear-gradient(-45deg, #1b2030 25%, transparent 25%) -8px 0 / 16px 16px,
+    #10141f;
+  min-height: 88px;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: 12px;
+}
+
+.pixel-img,
+.pixel-canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.sheet-labels {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.preview-controls {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .topbar,
+  .layout,
+  .stage-grid {
+    grid-template-columns: 1fr;
+  }
+}
