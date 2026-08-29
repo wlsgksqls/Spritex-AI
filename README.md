@@ -170,17 +170,52 @@ npm run dev
 
 브라우저에서 `http://127.0.0.1:3000` 을 엽니다. 테스트는 `npm test` 입니다.
 
-## Cloudflare Workers 배포
+## Cloudflare에 올리기
 
-이 앱은 **Cloudflare Workers** (OpenNext) 기준으로 맞춰져 있습니다. Pages Functions (`functions/`) 를 쓰지 않습니다.
+프론트엔드(스튜디오 UI)와 생성 API는 같은 Cloudflare 앱으로 올립니다. Next.js API 라우트가 있어서 **정적 HTML만 있는 Pages 사이트로는 동작하지 않고**, OpenNext Worker로 빌드합니다. 대시보드 메뉴는 **Workers & Pages** 입니다. Gemini 키는 여기 환경 변수에만 둡니다.
+
+### 1. Gemini 키 — Cloudflare 변수 (GitHub에 넣지 마세요)
+
+[Cloudflare 대시보드](https://dash.cloudflare.com) → **Workers & Pages** → `spritex-ai` → **Settings** → **Variables and Secrets**
+
+| 이름 | 타입 | 환경 |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | **Secret** | Production (필요하면 Preview에도 동일하게) |
+
+저장 후 스튜디오는 서버 키로 생성합니다. 사용자가 헤더에 키를 붙여넣으면 그 값이 우선합니다.
+
+### 2. GitHub에서 자동 배포
+
+저장소 워크플로: `.github/workflows/cloudflare.yml`
+
+`main`에 푸시하거나 Actions에서 **Run workflow** 하면 테스트 후 Cloudflare에 배포합니다.
+
+GitHub 저장소 **Settings → Secrets and variables → Actions** 에만 아래를 넣습니다. Gemini 키는 넣지 않습니다.
+
+| GitHub secret | 용도 |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | Workers 배포 권한 토큰 ([Account API tokens](https://dash.cloudflare.com/profile/api-tokens) → Edit Cloudflare Workers) |
+| `CLOUDFLARE_ACCOUNT_ID` | 계정 ID (Workers & Pages 개요 오른쪽) |
+
+배포 명령은 `--keep-vars` 를 써서, 대시보드에 넣어 둔 `GEMINI_API_KEY` 를 덮어쓰지 않습니다.
+
+### 3. Cloudflare가 GitHub를 직접 받기 (택1)
+
+GitHub Actions와 **동시에** 쓰면 배포가 두 번 됩니다. 하나만 고르세요.
+
+1. Workers & Pages → **Create** → **Connect to Git** → GitHub → `Spritex-AI`
+2. Production branch: `main`
+3. Build command: `npx opennextjs-cloudflare build`
+4. Deploy command: `npx wrangler deploy --keep-vars`
+5. 위 1번의 **Variables and Secrets** 에 `GEMINI_API_KEY` Secret 추가
+
+로컬에서 직접 올릴 때:
 
 ```bash
-cp .dev.vars.example .dev.vars   # 로컬 Worker 프리뷰용 시크릿
-npm run preview                  # workerd에서 로컬 실행
-npm run deploy                   # 빌드 후 Workers에 배포
+cp .dev.vars.example .dev.vars   # 로컬 Worker 프리뷰용
+npm run preview                  # workerd에서 확인
+npm run deploy                   # wrangler login 후 배포 (--keep-vars)
 ```
-
-대시보드에서 `GEMINI_API_KEY` 시크릿을 넣거나 `wrangler secret put GEMINI_API_KEY` 를 사용합니다.
 
 ## 라이선스
 

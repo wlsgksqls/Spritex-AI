@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const body = Body.parse(json);
     const result = await runSpriteJob({
       ...body,
-      apiKey: resolveGeminiApiKey(request),
+      apiKey: await resolveGeminiApiKey(request),
     });
     return Response.json(result);
   } catch (error) {

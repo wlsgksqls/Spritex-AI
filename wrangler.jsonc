@@ -23,8 +23,12 @@
   ],
   "observability": {
     "enabled": true
-  }
-  // Incremental Cache (optional): add an R2 bucket named NEXT_INC_CACHE_R2_BUCKET
-  // and wire r2IncrementalCache in open-next.config.ts.
+  },
+  "workers_dev": true,
+  "preview_urls": true
+  // GEMINI_API_KEY is a Cloudflare dashboard Secret (Workers & Pages →
+  // Settings → Variables and Secrets). Do not put it in this file.
+  // Deploy with --keep-vars so dashboard secrets/vars are not wiped.
+  // Incremental Cache (optional): R2 bucket NEXT_INC_CACHE_R2_BUCKET
   // Image optimization (optional): "images": { "binding": "IMAGES" }
 }

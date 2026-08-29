@@ -3,6 +3,8 @@
 interface __BaseEnv_CloudflareEnv {
 	ASSETS: Fetcher;
 	WORKER_SELF_REFERENCE: Fetcher /* spritex-ai */;
+	/** Set in Cloudflare dashboard (Workers & Pages → Variables and Secrets). Not committed. */
+	GEMINI_API_KEY?: string;
 }
 declare namespace Cloudflare {
 	interface Env extends __BaseEnv_CloudflareEnv {}
