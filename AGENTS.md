@@ -88,8 +88,8 @@ Spritex AI는 **게임 엔진에 바로 넣을 수 있는 캐릭터 스프라이
 | --- | --- | --- | --- |
 | `spriteSize` | 라디오 | `16` \| `32` \| `64` | `32` |
 | `view` | 라디오 | `side` \| `top` \| `quarter` | `side` |
-| `frameCount` | 숫자 | 4–16 정수 | `8` |
-| `fps` | 숫자 | 4–24 정수 | `8` |
+| `frameCount` | 숫자 | 4–16 정수. 시트 그림 장수. 바꾸면 재생성 | `8` |
+| `fps` | 숫자 | 4–24 정수. 초당 재생 장수. 미리보기/GIF에 바로 반영 | `8` |
 | `inplace` | 토글 | `true` = 제자리 고정, `false` = 칸 안 오프셋 허용 | `true` |
 | `loop` | 라디오 | `looping` \| `oneshot` | `looping` |
 | `characterPrompt` | textarea | 캐릭터가 누구인지 | 빈 값이면 생성 불가 |
@@ -233,7 +233,8 @@ readable silhouette, limited palette, no photorealism, no 3D render
 - `imageSmoothingEnabled = false`
 - CSS `image-rendering: pixelated`
 - 표시 배율은 정수만 (x4, x8). 32px 칸을 4.5배로 그리지 마라.
-- `requestAnimationFrame` + 경과 시간으로 프레임 인덱스 = `floor(elapsed * fps) % n` (looping)
+- `requestAnimationFrame` + 누적 시간으로 한 장당 `1000/fps` ms. 8 FPS면 1초에 정확히 8장이 넘어간다.
+- FPS는 재생 속도일 뿐이라 시트를 다시 뽑지 않는다. 미리보기와 GIF 다운로드가 현재 슬라이더 값을 따른다.
 - oneshot: 인덱스가 마지막 모션 프레임을 지나면 idle 프레임을 고정. 재생 버튼으로만 다시 시작.
 - 컨트롤: 재생, 정지, 프레임 스크러버.
 
@@ -241,7 +242,7 @@ readable silhouette, limited palette, no photorealism, no 3D render
 
 - 팔레트 양자화는 시트 전체에서 한 번만 (프레임마다 팔레트가 바뀌면 깜빡인다).
 - 투명색 유지.
-- delay = `1000/fps` ms. GIF는 10ms 단위라 반올림한다.
+- delay = `gifDelayMs(fps)` (10ms 단위, 8 FPS → 130ms). 미리보기는 정확한 `1000/fps` ms.
 - looping: Netscape loop 0 (무한).
 - oneshot: 모션 프레임 + idle, loop 1회.
 

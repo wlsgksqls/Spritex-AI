@@ -93,6 +93,14 @@ test("mock turnaround becomes a 4-direction 32px sheet", async () => {
   assert.equal(meta.height, 32);
 });
 
+test("gifDelayMs is 125ms-class for 8 FPS (10ms GIF steps)", async () => {
+  const { gifDelayMs, cycleSeconds, frameDurationMs } = await import("./timing");
+  assert.equal(frameDurationMs(8), 125);
+  assert.equal(cycleSeconds(8, 8), 1);
+  assert.equal(gifDelayMs(8), 130);
+  assert.equal(gifDelayMs(10), 100);
+});
+
 test("encodeGif writes a GIF header", async () => {
   const frame = await frameToCell(
     await solidPng(32, 32, { r: 40, g: 180, b: 90, alpha: 255 }),

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cycleSeconds } from "@/lib/timing";
 import type { LoopMode, SpriteSize, StudioOptions, ViewType } from "@/lib/types";
 import { SPRITE_SIZES } from "@/lib/types";
 
@@ -78,8 +79,21 @@ export function MotionOptions({
 }) {
   return (
     <div className="stack">
+      <div className="timing-card">
+        <p>
+          <strong>시트 장수</strong>는 그림이 몇 장인지입니다. 바꾸면 시트를 다시 생성해야 합니다.
+        </p>
+        <p>
+          <strong>FPS</strong>는 재생 속도입니다. 8이면 1초에 8장이 넘어갑니다. 미리보기에 바로
+          반영됩니다.
+        </p>
+        <p className="mono">
+          {options.frameCount}장 ÷ {options.fps}FPS = 한 바퀴{" "}
+          {cycleSeconds(options.frameCount, options.fps).toFixed(2)}초
+        </p>
+      </div>
       <label className="field">
-        <span>프레임 수 · {options.frameCount}</span>
+        <span>시트 장수 · {options.frameCount}장</span>
         <input
           type="range"
           min={4}
@@ -88,17 +102,18 @@ export function MotionOptions({
           disabled={disabled}
           onChange={(event) => onChange({ frameCount: Number(event.target.value) })}
         />
+        <small>모션을 몇 장의 그림으로 나눌지. 시트 가로 칸 수입니다.</small>
       </label>
       <label className="field">
-        <span>FPS · {options.fps}</span>
+        <span>FPS · 초당 {options.fps}장</span>
         <input
           type="range"
           min={4}
           max={24}
           value={options.fps}
-          disabled={disabled}
           onChange={(event) => onChange({ fps: Number(event.target.value) })}
         />
+        <small>한 장을 {Math.round(1000 / options.fps)}ms씩 보여 줍니다. 다시 생성할 필요 없습니다.</small>
       </label>
       <label className="field">
         <span>Inplace</span>

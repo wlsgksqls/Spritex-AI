@@ -1,5 +1,6 @@
 import { GIFEncoder, applyPalette, quantize } from "gifenc";
 import sharp from "sharp";
+import { gifDelayMs } from "./timing";
 import type { LoopMode } from "./types";
 
 export async function encodeGif(
@@ -37,7 +38,7 @@ export async function encodeGif(
   const palette = quantize(merged, 255, { format: "rgb565" });
   palette.unshift([0, 0, 0]);
 
-  const delay = Math.max(20, Math.round(100 / fps) * 10);
+  const delay = gifDelayMs(fps);
   const gif = GIFEncoder();
   const repeat = loop === "looping" ? 0 : -1;
 

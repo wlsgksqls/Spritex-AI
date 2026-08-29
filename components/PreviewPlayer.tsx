@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { cycleSeconds, frameDurationMs } from "@/lib/timing";
 import type { LoopMode } from "@/lib/types";
 
 type PreviewPlayerProps = {
@@ -15,9 +16,20 @@ export function PreviewPlayer({ frames, fps, loop, spriteSize }: PreviewPlayerPr
   const imagesRef = useRef<HTMLImageElement[]>([]);
   const playingRef = useRef(true);
   const indexRef = useRef(0);
+  const fpsRef = useRef(fps);
+  const loopRef = useRef(loop);
   const [playing, setPlaying] = useState(true);
   const [index, setIndex] = useState(0);
   const scale = spriteSize <= 16 ? 10 : spriteSize <= 32 ? 6 : 4;
+
+  useEffect(() => {
+    fpsRef.current = fps;
+    loopRef.current = loop;
+  }, [fps, loop]);
+
+  const motionCount = loop === "oneshot" ? Math.max(frames.length - 1, 1) : frames.length;
+  const durationMs = frameDurationMs(fps);
+  const cycle = cycleSeconds(motionCount, fps);
 
   const draw = (frameIndex: number) => {
     const canvas = canvasRef.current;
@@ -58,31 +70,34 @@ export function PreviewPlayer({ frames, fps, loop, spriteSize }: PreviewPlayerPr
     if (frames.length === 0) return;
     let raf = 0;
     let last = performance.now();
-    let elapsed = 0;
-    indexRef.current = 0;
-    playingRef.current = true;
-    const motionCount = loop === "oneshot" ? Math.max(frames.length - 1, 1) : frames.length;
+    let leftover = 0;
 
     const tick = (now: number) => {
       const delta = now - last;
       last = now;
+      const currentFps = Math.max(1, fpsRef.current);
+      const currentLoop = loopRef.current;
+      const holdCount =
+        currentLoop === "oneshot" ? Math.max(frames.length - 1, 1) : frames.length;
       if (playingRef.current) {
-        elapsed += delta;
-        const next = Math.floor((elapsed / 1000) * fps);
-        let nextIndex = indexRef.current;
-        if (loop === "looping") {
-          nextIndex = next % frames.length;
-        } else if (next >= motionCount) {
-          nextIndex = frames.length - 1;
-          playingRef.current = false;
-          setPlaying(false);
-        } else {
-          nextIndex = next;
-        }
-        if (nextIndex !== indexRef.current) {
-          indexRef.current = nextIndex;
-          setIndex(nextIndex);
-          draw(nextIndex);
+        leftover += delta;
+        const duration = 1000 / currentFps;
+        while (leftover >= duration) {
+          leftover -= duration;
+          let nextIndex = indexRef.current + 1;
+          if (currentLoop === "looping") {
+            nextIndex %= frames.length;
+          } else if (nextIndex >= holdCount) {
+            nextIndex = frames.length - 1;
+            playingRef.current = false;
+            leftover = 0;
+            setPlaying(false);
+          }
+          if (nextIndex !== indexRef.current) {
+            indexRef.current = nextIndex;
+            setIndex(nextIndex);
+            draw(nextIndex);
+          }
         }
       }
       raf = requestAnimationFrame(tick);
@@ -90,7 +105,7 @@ export function PreviewPlayer({ frames, fps, loop, spriteSize }: PreviewPlayerPr
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frames, fps, loop, spriteSize]);
+  }, [frames, spriteSize]);
 
   if (frames.length === 0) {
     return <p className="muted">아직 재생할 프레임이 없습니다.</p>;
@@ -106,6 +121,10 @@ export function PreviewPlayer({ frames, fps, loop, spriteSize }: PreviewPlayerPr
           className="pixel-canvas"
         />
       </div>
+      <p className="timing-line">
+        초당 {fps}장 · 한 장 {Math.round(durationMs)}ms
+        {loop === "looping" ? ` · 한 바퀴 ${cycle.toFixed(2)}초` : " · 원샷 후 idle"}
+      </p>
       <div className="preview-controls">
         <button
           type="button"
@@ -133,7 +152,7 @@ export function PreviewPlayer({ frames, fps, loop, spriteSize }: PreviewPlayerPr
           }}
         />
         <span className="mono">
-          {index + 1}/{frames.length} · {fps} FPS
+          {index + 1}/{frames.length}
         </span>
       </div>
     </div>
