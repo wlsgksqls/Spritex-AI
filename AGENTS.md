@@ -256,12 +256,13 @@ readable silhouette, limited palette, no photorealism, no 3D render
 
 | 용도 | 선택 | 이유 |
 | --- | --- | --- |
-| 프레임워크 | **Next.js (App Router) + TypeScript** | 프론트와 API를 한 레포, Vercel 배포 쉬움 |
+| 프레임워크 | **Next.js (App Router) + TypeScript** | 프론트와 API를 한 레포. **Cloudflare Workers**에 OpenNext로 올린다 |
 | 스타일 | **Tailwind CSS** | 컨트롤 많은 툴 UI를 빨리 짬 |
 | 검증 | **zod** | `/api` 바디 검증 |
 | 생성 API | **Gemini** (`@google/genai`, `gemini-2.5-flash-image`) | 텍스트/참고이미지 → 그리드 시트 |
-| 이미지 처리 | **sharp** | 크롭, 합성, nearest resize, PNG |
+| 이미지 처리 | **pngjs** (순수 JS) | Workers에서 sharp 네이티브 바이너리를 못 씀. 크롭/합성/nearest resize/PNG |
 | GIF | **gifenc** | 서버에서 팔레트 GIF |
+| 배포 | **Cloudflare Workers** (`@opennextjs/cloudflare` + Wrangler) | Pages Functions가 아님. `wrangler.jsonc` + `open-next.config.ts` |
 | 상태 | 클라이언트는 React state. 전역이 필요하면 zustand 한 개 | v1에 DB 없음 |
 
 패키지 매니저: **pnpm** (없으면 npm도 허용). React 실험 컴파일러 같은 비필수 옵션은 켜지 마라.
@@ -282,17 +283,30 @@ readable silhouette, limited palette, no photorealism, no 3D render
 
 ### 환경 변수
 
-`.env.local` (커밋 금지):
+로컬 Next (`npm run dev`): `.env.local` (커밋 금지)
 
 ```
 GEMINI_API_KEY=...
 ```
 
+Workers 로컬 프리뷰 (`npm run preview`): `.dev.vars` (커밋 금지, `.dev.vars.example` 복사)
+
+```
+NEXTJS_ENV=development
+GEMINI_API_KEY=...
+```
+
+배포 시 Cloudflare 대시보드 / `wrangler secret put GEMINI_API_KEY` 로 시크릿을 넣는다.
+
 ### 호스트 / 런타임
 
-- Node.js 20+
-- sharp는 네이티브 바이너리가 필요하다. serverless에서 막히면 `@img/sharp-linux-x64` 또는 해당 플랫폼 optional dep를 확인한다.
-- 생성은 수십 초가 걸린다. Next Route Handler에서 fal `subscribe`로 기다린다. 타임아웃이 짧으면 `maxDuration`을 60–120초로 올린다.
+- 배포 타깃은 **Cloudflare Workers**다. `@opennextjs/cloudflare`가 `next build` 결과를 Worker 번들로 바꾼다.
+- **Pages `functions/` 디렉터리를 만들지 마라.** OpenNext Worker와 충돌한다.
+- `export const runtime = "edge"` 금지. OpenNext Cloudflare는 edge runtime을 지원하지 않는다. nodejs가 기본이다.
+- **sharp 금지.** Workers에 네이티브 바이너리가 없다. PNG 처리는 `lib/png.ts` (`pngjs`)만 쓴다.
+- 로컬 개발은 계속 `npm run dev` (Node). Worker 런타임에 가까운 확인은 `npm run preview`.
+- 생성은 Gemini 왕복 때문에 수십 초가 걸릴 수 있다. Workers CPU 한도(유료 약 30초)에 걸리면 타임아웃이 난다. 그때는 mock 경로와 클라이언트 키 흐름은 유지한 채, 긴 생성만 별도 전략을 본다.
+- `maxDuration` export는 Vercel 힌트일 뿐이고 Workers에서는 무시된다.
 
 ---
 
@@ -306,10 +320,14 @@ GEMINI_API_KEY=...
   README.md
   LICENSE
   package.json
-  next.config.ts
+  next.config.ts            ← initOpenNextCloudflareForDev()
+  open-next.config.ts       ← defineCloudflareConfig
+  wrangler.jsonc            ← Worker 이름, nodejs_compat, ASSETS
+  cloudflare-env.d.ts       ← wrangler types (cf-typegen)
   tsconfig.json
-  .env.example              ← FAL_KEY만 명시
-  .gitignore
+  .env.example              ← GEMINI_API_KEY
+  .dev.vars.example         ← NEXTJS_ENV + GEMINI_API_KEY (Workers 프리뷰)
+  .gitignore                ← .open-next, .wrangler, .dev.vars
   app/
     layout.tsx
     page.tsx                ← 스튜디오 UI
@@ -317,6 +335,8 @@ GEMINI_API_KEY=...
     api/
       character/route.ts    ← 단계 1
       sprite/route.ts       ← 단계 2
+      gif/route.ts          ← 미리보기 GIF 재인코딩
+      config/route.ts       ← 서버 키 유무
   components/
     Studio.tsx
     OptionPanel.tsx
@@ -326,13 +346,15 @@ GEMINI_API_KEY=...
     types.ts                ← 아래 타입을 그대로 둬라
     prompts.ts              ← 모델 프롬프트 조립
     gemini.ts               ← Gemini 이미지 생성 래퍼
+    png.ts                  ← pngjs decode/encode/resize/composite
     sheet.ts                ← 크롭 / 리사이즈 / inplace / 합성
     gif.ts                  ← gifenc
-    mock.ts                 ← FAL_KEY 없을 때 체커보드 프레임
+    mock.ts                 ← 키 없을 때 픽셀 캐릭터 프레임
   public/
+    _headers                ← /_next/static 캐시
 ```
 
-인증, Prisma, Supabase, 업로드 스토리지는 v1에 넣지 않는다. 생성 결과는 메모리/일시 URL로 클라이언트에 내려주고, 브라우저가 PNG/GIF를 다운로드한다.
+인증, Prisma, Supabase, 업로드 스토리지는 v1에 넣지 않는다. 생성 결과는 메모리/data URL로 클라이언트에 내려주고, 브라우저가 PNG/GIF를 다운로드한다. R2는 아직 쓰지 않는다.
 
 ---
 
@@ -397,7 +419,7 @@ API는 JSON으로 data URL 또는 짧은 수명의 fal CDN URL을 반환해도 �
 6. `POST /api/character` 단계 1 실생성.
 7. `POST /api/sprite` 단계 2 실생성. 참고 이미지 필수.
 8. 로딩/에러/재생성. 단계 2는 단계 1 없이 비활성.
-9. README에 “로컬 실행: pnpm i, FAL_KEY, pnpm dev” 한 블록만 추가해도 된다. 소개 본문은 유지.
+9. README에 “로컬 실행: npm i, GEMINI_API_KEY, npm run dev” 한 블록만 추가해도 된다. 소개 본문은 유지. Cloudflare 배포는 `npm run preview` / `npm run deploy`.
 
 각 단계가 끝날 때마다 커밋한다.
 

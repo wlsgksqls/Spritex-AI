@@ -1,5 +1,5 @@
-import sharp from "sharp";
 import { gridForFrameCount } from "./grid";
+import { encodePng, resizeNearest, type RgbaBitmap } from "./png";
 import type { Direction, SpriteSize, ViewType } from "./types";
 
 const BG: [number, number, number, number] = [242, 239, 230, 255];
@@ -171,12 +171,13 @@ function drawCharacter(
 }
 
 async function canvasToPng(canvas: Canvas, scale: number): Promise<Buffer> {
-  return sharp(canvas.data, {
-    raw: { width: canvas.width, height: canvas.height, channels: 4 },
-  })
-    .resize(canvas.width * scale, canvas.height * scale, { kernel: sharp.kernel.nearest })
-    .png()
-    .toBuffer();
+  const bitmap: RgbaBitmap = {
+    data: canvas.data,
+    width: canvas.width,
+    height: canvas.height,
+  };
+  const scaled = resizeNearest(bitmap, canvas.width * scale, canvas.height * scale);
+  return encodePng(scaled);
 }
 
 function inferMotion(prompt: string): "walk" | "attack" | "idle" {

@@ -3,7 +3,6 @@ import { runSpriteJob } from "@/lib/jobs";
 import { resolveGeminiApiKey } from "@/lib/keys";
 
 export const maxDuration = 120;
-export const runtime = "nodejs";
 
 const Body = z.object({
   spriteSize: z.union([z.literal(16), z.literal(32), z.literal(64)]),

@@ -3,7 +3,6 @@ import { parseDataUrl } from "@/lib/dataUrl";
 import { encodeGif } from "@/lib/gif";
 
 export const maxDuration = 30;
-export const runtime = "nodejs";
 
 const Body = z.object({
   frames: z.array(z.string().min(1)).min(1).max(24),

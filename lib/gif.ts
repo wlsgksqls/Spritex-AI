@@ -1,5 +1,5 @@
 import { GIFEncoder, applyPalette, quantize } from "gifenc";
-import sharp from "sharp";
+import { decodePng } from "./png";
 import { gifDelayMs } from "./timing";
 import type { LoopMode } from "./types";
 
@@ -12,19 +12,14 @@ export async function encodeGif(
     throw new Error("GIF로 만들 프레임이 없습니다.");
   }
 
-  const decoded = await Promise.all(
-    frames.map(async (frame) => {
-      const { data, info } = await sharp(frame)
-        .ensureAlpha()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-      return {
-        data: new Uint8Array(data),
-        width: info.width,
-        height: info.height,
-      };
-    }),
-  );
+  const decoded = frames.map((frame) => {
+    const bitmap = decodePng(frame);
+    return {
+      data: new Uint8Array(bitmap.data),
+      width: bitmap.width,
+      height: bitmap.height,
+    };
+  });
 
   const width = decoded[0].width;
   const height = decoded[0].height;

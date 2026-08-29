@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": ".open-next/worker.js",
+  "name": "spritex-ai",
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": [
+    // Node.js APIs (Buffer, process.env, etc.)
+    "nodejs_compat",
+    // Copy Worker bindings/secrets onto process.env for Next.js
+    "nodejs_compat_populate_process_env",
+    // Allow fetch() of public URLs (Gemini API)
+    "global_fetch_strictly_public"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "spritex-ai"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+  // Incremental Cache (optional): add an R2 bucket named NEXT_INC_CACHE_R2_BUCKET
+  // and wire r2IncrementalCache in open-next.config.ts.
+  // Image optimization (optional): "images": { "binding": "IMAGES" }
+}

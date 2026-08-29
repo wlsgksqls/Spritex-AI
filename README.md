@@ -170,6 +170,18 @@ npm run dev
 
 브라우저에서 `http://127.0.0.1:3000` 을 엽니다. 테스트는 `npm test` 입니다.
 
+## Cloudflare Workers 배포
+
+이 앱은 **Cloudflare Workers** (OpenNext) 기준으로 맞춰져 있습니다. Pages Functions (`functions/`) 를 쓰지 않습니다.
+
+```bash
+cp .dev.vars.example .dev.vars   # 로컬 Worker 프리뷰용 시크릿
+npm run preview                  # workerd에서 로컬 실행
+npm run deploy                   # 빌드 후 Workers에 배포
+```
+
+대시보드에서 `GEMINI_API_KEY` 시크릿을 넣거나 `wrangler secret put GEMINI_API_KEY` 를 사용합니다.
+
 ## 라이선스
 
 MIT License. 자세한 내용은 [LICENSE](LICENSE) 파일을 참고하세요.

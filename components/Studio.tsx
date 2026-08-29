@@ -18,6 +18,36 @@ function downloadDataUrl(url: string, filename: string) {
   link.click();
 }
 
+async function fileToPngDataUrl(file: File): Promise<string> {
+  if (file.type === "image/png") {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("이미지를 읽지 못했습니다."));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("이미지를 열지 못했습니다."));
+      el.src = objectUrl;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("캔버스를 만들 수 없습니다.");
+    ctx.drawImage(image, 0, 0);
+    return canvas.toDataURL("image/png");
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 async function postJson<T>(url: string, body: unknown, apiKey: string): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (apiKey) headers["x-gemini-api-key"] = apiKey;
@@ -253,12 +283,16 @@ export function Studio() {
                         setReferenceName(null);
                         return;
                       }
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        setReferenceDataUrl(String(reader.result));
-                        setReferenceName(file.name);
-                      };
-                      reader.readAsDataURL(file);
+                      void fileToPngDataUrl(file)
+                        .then((dataUrl) => {
+                          setReferenceDataUrl(dataUrl);
+                          setReferenceName(file.name);
+                        })
+                        .catch((err) => {
+                          setReferenceDataUrl(undefined);
+                          setReferenceName(null);
+                          setError(err instanceof Error ? err.message : "이미지를 읽지 못했습니다.");
+                        });
                     }}
                   />
                   {referenceName && <small>{referenceName}</small>}

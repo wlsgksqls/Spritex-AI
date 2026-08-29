@@ -1,43 +1,30 @@
-import sharp from "sharp";
 import { gridForFrameCount } from "./grid";
+import {
+  composite,
+  createTransparent,
+  decodePng,
+  encodePng,
+  extract,
+  fillRect,
+  resizeNearest,
+  type RgbaBitmap,
+} from "./png";
 import type { Direction, SpriteSize } from "./types";
 import { DIRECTIONS } from "./types";
 
-export type RgbaBitmap = {
-  data: Buffer;
-  width: number;
-  height: number;
-};
-
+export type { RgbaBitmap };
 export type BBox = { minX: number; minY: number; maxX: number; maxY: number };
 
 export async function decodeRgba(input: Buffer): Promise<RgbaBitmap> {
-  const { data, info } = await sharp(input)
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  return { data: Buffer.from(data), width: info.width, height: info.height };
+  return decodePng(input);
 }
 
-export async function encodePng(bitmap: RgbaBitmap): Promise<Buffer> {
-  return sharp(bitmap.data, {
-    raw: { width: bitmap.width, height: bitmap.height, channels: 4 },
-  })
-    .png()
-    .toBuffer();
+export async function encodePngBuffer(bitmap: RgbaBitmap): Promise<Buffer> {
+  return encodePng(bitmap);
 }
 
 export async function emptyCell(spriteSize: number): Promise<Buffer> {
-  return sharp({
-    create: {
-      width: spriteSize,
-      height: spriteSize,
-      channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    },
-  })
-    .png()
-    .toBuffer();
+  return encodePng(createTransparent(spriteSize, spriteSize));
 }
 
 function colorDist(
@@ -138,31 +125,17 @@ export function opaqueBBox(bitmap: RgbaBitmap, alphaMin = 8): BBox | null {
   return { minX, minY, maxX, maxY };
 }
 
-export async function sliceGrid(
-  image: Buffer,
-  cols: number,
-  rows: number,
-): Promise<Buffer[]> {
-  const meta = await sharp(image).metadata();
-  const width = meta.width;
-  const height = meta.height;
-  if (!width || !height) {
-    throw new Error("이미지 크기를 읽을 수 없습니다.");
-  }
-  const cellW = Math.floor(width / cols);
-  const cellH = Math.floor(height / rows);
+export async function sliceGrid(image: Buffer, cols: number, rows: number): Promise<Buffer[]> {
+  const bitmap = decodePng(image);
+  const cellW = Math.floor(bitmap.width / cols);
+  const cellH = Math.floor(bitmap.height / rows);
   if (cellW < 1 || cellH < 1) {
     throw new Error("그리드 칸이 너무 작습니다.");
   }
   const cells: Buffer[] = [];
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
-      cells.push(
-        await sharp(image)
-          .extract({ left: col * cellW, top: row * cellH, width: cellW, height: cellH })
-          .png()
-          .toBuffer(),
-      );
+      cells.push(encodePng(extract(bitmap, col * cellW, row * cellH, cellW, cellH)));
     }
   }
   return cells;
@@ -173,7 +146,7 @@ export async function frameToCell(
   spriteSize: number,
   inplace: boolean,
 ): Promise<Buffer> {
-  const bitmap = await decodeRgba(input);
+  const bitmap = decodePng(input);
   knockOutBackground(bitmap);
   const bbox = opaqueBBox(bitmap);
   if (!bbox) {
@@ -188,14 +161,7 @@ export async function frameToCell(
   const scale = Math.min(maxW / boxW, maxH / boxH);
   const destW = Math.max(1, Math.round(boxW * scale));
   const destH = Math.max(1, Math.round(boxH * scale));
-
-  const cropped = await sharp(bitmap.data, {
-    raw: { width: bitmap.width, height: bitmap.height, channels: 4 },
-  })
-    .extract({ left: bbox.minX, top: bbox.minY, width: boxW, height: boxH })
-    .resize(destW, destH, { kernel: sharp.kernel.nearest })
-    .png()
-    .toBuffer();
+  const cropped = resizeNearest(extract(bitmap, bbox.minX, bbox.minY, boxW, boxH), destW, destH);
 
   let left: number;
   let top: number;
@@ -209,34 +175,20 @@ export async function frameToCell(
   left = Math.min(Math.max(left, 0), spriteSize - destW);
   top = Math.min(Math.max(top, 0), spriteSize - destH);
 
-  return sharp({
-    create: {
-      width: spriteSize,
-      height: spriteSize,
-      channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    },
-  })
-    .composite([{ input: cropped, left, top }])
-    .png()
-    .toBuffer();
+  const cell = createTransparent(spriteSize, spriteSize);
+  composite(cell, cropped, left, top);
+  return encodePng(cell);
 }
 
 export async function composeRow(frames: Buffer[], spriteSize: number): Promise<Buffer> {
   if (frames.length === 0) {
     return emptyCell(spriteSize);
   }
-  return sharp({
-    create: {
-      width: spriteSize * frames.length,
-      height: spriteSize,
-      channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    },
-  })
-    .composite(frames.map((input, index) => ({ input, left: index * spriteSize, top: 0 })))
-    .png()
-    .toBuffer();
+  const row = createTransparent(spriteSize * frames.length, spriteSize);
+  frames.forEach((frame, index) => {
+    composite(row, decodePng(frame), index * spriteSize, 0);
+  });
+  return encodePng(row);
 }
 
 export async function processTurnaround(
@@ -270,4 +222,14 @@ export async function processMotionSheet(
   }
   const sheet = await composeRow(frames, spriteSize);
   return { frames, sheet };
+}
+
+export function solidBitmap(
+  width: number,
+  height: number,
+  color: { r: number; g: number; b: number; alpha: number },
+): Buffer {
+  const bitmap = createTransparent(width, height);
+  fillRect(bitmap, 0, 0, width, height, color);
+  return encodePng(bitmap);
 }

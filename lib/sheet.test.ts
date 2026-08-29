@@ -1,38 +1,53 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import sharp from "sharp";
-import { composeRow, decodeRgba, frameToCell, opaqueBBox, processTurnaround, sliceGrid } from "./sheet";
+import { PNG } from "pngjs";
 import { encodeGif } from "./gif";
 import { mockTurnaround } from "./mock";
+import { composite, createTransparent, decodePng, encodePng, fillRect } from "./png";
+import {
+  composeRow,
+  decodeRgba,
+  frameToCell,
+  opaqueBBox,
+  processTurnaround,
+  sliceGrid,
+  solidBitmap,
+} from "./sheet";
 
-async function solidPng(
+function solidPng(width: number, height: number, color: { r: number; g: number; b: number; alpha: number }) {
+  return solidBitmap(width, height, color);
+}
+
+function pngSize(buffer: Buffer) {
+  const png = PNG.sync.read(buffer);
+  return { width: png.width, height: png.height };
+}
+
+function placeOnCanvas(
   width: number,
   height: number,
-  color: { r: number; g: number; b: number; alpha: number },
-): Promise<Buffer> {
-  return sharp({
-    create: { width, height, channels: 4, background: color },
-  })
-    .png()
-    .toBuffer();
+  background: { r: number; g: number; b: number; alpha: number },
+  parts: Array<{ input: Buffer; left: number; top: number }>,
+): Buffer {
+  const canvas = createTransparent(width, height);
+  fillRect(canvas, 0, 0, width, height, background);
+  for (const part of parts) {
+    composite(canvas, decodePng(part.input), part.left, part.top);
+  }
+  return encodePng(canvas);
 }
 
 test("sliceGrid splits a 2x2 sheet in row-major order", async () => {
-  const red = await solidPng(8, 8, { r: 255, g: 0, b: 0, alpha: 255 });
-  const green = await solidPng(8, 8, { r: 0, g: 255, b: 0, alpha: 255 });
-  const blue = await solidPng(8, 8, { r: 0, g: 0, b: 255, alpha: 255 });
-  const white = await solidPng(8, 8, { r: 255, g: 255, b: 255, alpha: 255 });
-  const sheet = await sharp({
-    create: { width: 16, height: 16, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 255 } },
-  })
-    .composite([
-      { input: red, left: 0, top: 0 },
-      { input: green, left: 8, top: 0 },
-      { input: blue, left: 0, top: 8 },
-      { input: white, left: 8, top: 8 },
-    ])
-    .png()
-    .toBuffer();
+  const red = solidPng(8, 8, { r: 255, g: 0, b: 0, alpha: 255 });
+  const green = solidPng(8, 8, { r: 0, g: 255, b: 0, alpha: 255 });
+  const blue = solidPng(8, 8, { r: 0, g: 0, b: 255, alpha: 255 });
+  const white = solidPng(8, 8, { r: 255, g: 255, b: 255, alpha: 255 });
+  const sheet = placeOnCanvas(16, 16, { r: 0, g: 0, b: 0, alpha: 255 }, [
+    { input: red, left: 0, top: 0 },
+    { input: green, left: 8, top: 0 },
+    { input: blue, left: 0, top: 8 },
+    { input: white, left: 8, top: 8 },
+  ]);
 
   const cells = await sliceGrid(sheet, 2, 2);
   const colors = await Promise.all(
@@ -48,18 +63,10 @@ test("sliceGrid splits a 2x2 sheet in row-major order", async () => {
 });
 
 test("frameToCell inplace plants feet at the bottom center", async () => {
-  const blob = await solidPng(20, 20, { r: 220, g: 40, b: 40, alpha: 255 });
-  const canvas = await sharp({
-    create: {
-      width: 80,
-      height: 80,
-      channels: 4,
-      background: { r: 255, g: 255, b: 255, alpha: 255 },
-    },
-  })
-    .composite([{ input: blob, left: 8, top: 10 }])
-    .png()
-    .toBuffer();
+  const blob = solidPng(20, 20, { r: 220, g: 40, b: 40, alpha: 255 });
+  const canvas = placeOnCanvas(80, 80, { r: 255, g: 255, b: 255, alpha: 255 }, [
+    { input: blob, left: 8, top: 10 },
+  ]);
 
   const cell = await frameToCell(canvas, 32, true);
   const bitmap = await decodeRgba(cell);
@@ -73,10 +80,10 @@ test("frameToCell inplace plants feet at the bottom center", async () => {
 });
 
 test("composeRow width equals frameCount * spriteSize", async () => {
-  const a = await frameToCell(await solidPng(16, 16, { r: 10, g: 200, b: 80, alpha: 255 }), 16, true);
-  const b = await frameToCell(await solidPng(16, 16, { r: 10, g: 80, b: 200, alpha: 255 }), 16, true);
+  const a = await frameToCell(solidPng(16, 16, { r: 10, g: 200, b: 80, alpha: 255 }), 16, true);
+  const b = await frameToCell(solidPng(16, 16, { r: 10, g: 80, b: 200, alpha: 255 }), 16, true);
   const row = await composeRow([a, b, a, b], 16);
-  const meta = await sharp(row).metadata();
+  const meta = pngSize(row);
   assert.equal(meta.width, 64);
   assert.equal(meta.height, 16);
 });
@@ -88,7 +95,7 @@ test("mock turnaround becomes a 4-direction 32px sheet", async () => {
     spriteSize: 32,
   });
   const result = await processTurnaround(raw, 32);
-  const meta = await sharp(result.sheet).metadata();
+  const meta = pngSize(result.sheet);
   assert.equal(meta.width, 128);
   assert.equal(meta.height, 32);
 });
@@ -102,11 +109,7 @@ test("gifDelayMs is 125ms-class for 8 FPS (10ms GIF steps)", async () => {
 });
 
 test("encodeGif writes a GIF header", async () => {
-  const frame = await frameToCell(
-    await solidPng(32, 32, { r: 40, g: 180, b: 90, alpha: 255 }),
-    16,
-    true,
-  );
+  const frame = await frameToCell(solidPng(32, 32, { r: 40, g: 180, b: 90, alpha: 255 }), 16, true);
   const gif = await encodeGif([frame, frame, frame], 8, "looping");
   assert.equal(gif.subarray(0, 6).toString("ascii"), "GIF89a");
   assert.ok(gif.length > 32);
