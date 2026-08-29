@@ -296,17 +296,19 @@ NEXTJS_ENV=development
 GEMINI_API_KEY=...
 ```
 
-배포 시 `GEMINI_API_KEY`는 **GitHub 시크릿이 아니다.** Cloudflare 대시보드 Workers & Pages → 프로젝트 → Settings → Variables and Secrets 에 Secret으로 넣는다. `wrangler.jsonc`의 `vars`에 적지 마라. 배포는 `--keep-vars`로 해서 대시보드 값이 지워지지 않게 한다.
+배포 시 `GEMINI_API_KEY`는 **GitHub 시크릿이 아니다.** Cloudflare Pages 프로젝트 `spritex-ai` → Settings → Variables and Secrets 에 Secret으로 넣는다. `wrangler.jsonc`의 `vars`에 적지 마라.
 
-GitHub Actions(`.github/workflows/cloudflare.yml`)는 `main` 푸시 때 Cloudflare에 올린다. 여기에 필요한 건 배포 자격 증명뿐이다.
+프론트는 **Cloudflare Pages**다. OpenNext Worker를 `.open-next/_worker.js` 로 옮겨 Pages advanced mode로 올린다. 빌드 커맨드는 `npm run pages:build`, 출력 디렉터리는 `.open-next`. `functions/` 디렉터리는 만들지 마라.
+
+GitHub Actions는 `wrangler pages deploy` 로 같은 Pages 프로젝트에 올린다 (토큰이 있을 때만).
 
 - GitHub Actions secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
-- Cloudflare 변수: `GEMINI_API_KEY` (Secret)
+- Cloudflare Pages 변수: `GEMINI_API_KEY` (Secret)
 
 ### 호스트 / 런타임
 
-- 배포 타깃은 **Cloudflare**다. 대시보드 이름은 Workers & Pages. Next.js App Router + API라 정적 Pages `functions/` 만으로는 안 되고, OpenNext Worker로 프론트를 올린다.
-- **Pages `functions/` 디렉터리를 만들지 마라.** OpenNext Worker와 충돌한다.
+- 배포 타깃은 **Cloudflare Pages** (`spritex-ai.pages.dev`). Next.js App Router + API라 정적 HTML만 올리면 404다. OpenNext + `_worker.js` 로 올린다.
+- **Pages `functions/` 디렉터리를 만들지 마라.** `_worker.js` advanced mode와 충돌한다.
 - `export const runtime = "edge"` 금지. OpenNext Cloudflare는 edge runtime을 지원하지 않는다. nodejs가 기본이다.
 - **sharp 금지.** Workers에 네이티브 바이너리가 없다. PNG 처리는 `lib/png.ts` (`pngjs`)만 쓴다.
 - 로컬 개발은 계속 `npm run dev` (Node). Worker 런타임에 가까운 확인은 `npm run preview`.
@@ -327,9 +329,11 @@ GitHub Actions(`.github/workflows/cloudflare.yml`)는 `main` 푸시 때 Cloudfla
   package.json
   next.config.ts            ← initOpenNextCloudflareForDev()
   open-next.config.ts       ← defineCloudflareConfig
-  wrangler.jsonc            ← Worker 이름, nodejs_compat, ASSETS
+  wrangler.jsonc            ← Worker 이름, nodejs_compat, ASSETS (로컬 preview)
+  wrangler.pages.jsonc      ← Pages 배포 (pages_build_output_dir)
+  scripts/prepare-cloudflare-pages.mjs  ← worker.js → _worker.js + assets
   cloudflare-env.d.ts       ← wrangler types (cf-typegen)
-  .github/workflows/cloudflare.yml  ← main 푸시 → Cloudflare 배포
+  .github/workflows/cloudflare.yml  ← Pages에 wrangler pages deploy
   tsconfig.json
   .env.example              ← GEMINI_API_KEY
   .dev.vars.example         ← NEXTJS_ENV + GEMINI_API_KEY (Workers 프리뷰)

@@ -170,51 +170,52 @@ npm run dev
 
 브라우저에서 `http://127.0.0.1:3000` 을 엽니다. 테스트는 `npm test` 입니다.
 
-## Cloudflare에 올리기
+## Cloudflare Pages에 올리기
 
-프론트엔드(스튜디오 UI)와 생성 API는 같은 Cloudflare 앱으로 올립니다. Next.js API 라우트가 있어서 **정적 HTML만 있는 Pages 사이트로는 동작하지 않고**, OpenNext Worker로 빌드합니다. 대시보드 메뉴는 **Workers & Pages** 입니다. Gemini 키는 여기 환경 변수에만 둡니다.
+프론트엔드와 생성 API는 같은 Cloudflare Pages 앱(`spritex-ai`)으로 올립니다. Next.js API가 있어서 정적 HTML만 올리면 빈 404가 납니다. OpenNext로 Worker를 만든 뒤 Pages advanced mode(`_worker.js`)로 붙입니다.
 
-### 1. Gemini 키 — Cloudflare 변수 (GitHub에 넣지 마세요)
+`GEMINI_API_KEY` 는 GitHub에 넣지 말고 **Pages 환경 변수**로만 둡니다.
 
-[Cloudflare 대시보드](https://dash.cloudflare.com) → **Workers & Pages** → `spritex-ai` → **Settings** → **Variables and Secrets**
+### 1. Pages 프로젝트 빌드 설정 (지금 404가 나는 이유)
+
+[Workers & Pages](https://dash.cloudflare.com) → `spritex-ai` → **Settings** → **Builds & deployments**
+
+| 항목 | 값 |
+| --- | --- |
+| Framework preset | **None** |
+| Build command | `npm run pages:build` |
+| Build output directory | `.open-next` |
+| Root directory | `/` |
+| Node version | `22` |
+
+이 값이 맞아야 PR 프리뷰(`*.spritex-ai.pages.dev`)가 스튜디오를 보여 줍니다.
+
+### 2. Gemini 키 — Pages 변수
+
+같은 프로젝트 → **Settings** → **Variables and Secrets** (Environment variables)
 
 | 이름 | 타입 | 환경 |
 | --- | --- | --- |
-| `GEMINI_API_KEY` | **Secret** | Production (필요하면 Preview에도 동일하게) |
+| `GEMINI_API_KEY` | **Secret** | Production + Preview |
 
-저장 후 스튜디오는 서버 키로 생성합니다. 사용자가 헤더에 키를 붙여넣으면 그 값이 우선합니다.
+저장 후 스튜디오는 서버 키로 생성합니다. 헤더에 붙인 키가 있으면 그게 우선합니다.
 
-### 2. GitHub에서 자동 배포
+### 3. GitHub Actions Direct Upload (선택)
 
-저장소 워크플로: `.github/workflows/cloudflare.yml`
+`.github/workflows/cloudflare.yml` 은 `wrangler pages deploy` 로 같은 Pages 프로젝트에 올립니다. Pages Git 빌드가 예전 wrangler로 `_worker.js` 를 깨뜨릴 때를 대비한 경로입니다. **Pages Git과 둘 다 켜면 배포가 두 번** 됩니다.
 
-`main`에 푸시하거나 Actions에서 **Run workflow** 하면 테스트 후 Cloudflare에 배포합니다.
-
-GitHub 저장소 **Settings → Secrets and variables → Actions** 에만 아래를 넣습니다. Gemini 키는 넣지 않습니다.
+GitHub **Settings → Secrets and variables → Actions** (Gemini 키는 넣지 마세요):
 
 | GitHub secret | 용도 |
 | --- | --- |
-| `CLOUDFLARE_API_TOKEN` | Workers 배포 권한 토큰 ([Account API tokens](https://dash.cloudflare.com/profile/api-tokens) → Edit Cloudflare Workers) |
-| `CLOUDFLARE_ACCOUNT_ID` | 계정 ID (Workers & Pages 개요 오른쪽) |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API 토큰 (Pages 배포) |
+| `CLOUDFLARE_ACCOUNT_ID` | 계정 ID |
 
-배포 명령은 `--keep-vars` 를 써서, 대시보드에 넣어 둔 `GEMINI_API_KEY` 를 덮어쓰지 않습니다.
-
-### 3. Cloudflare가 GitHub를 직접 받기 (택1)
-
-GitHub Actions와 **동시에** 쓰면 배포가 두 번 됩니다. 하나만 고르세요.
-
-1. Workers & Pages → **Create** → **Connect to Git** → GitHub → `Spritex-AI`
-2. Production branch: `main`
-3. Build command: `npx opennextjs-cloudflare build`
-4. Deploy command: `npx wrangler deploy --keep-vars`
-5. 위 1번의 **Variables and Secrets** 에 `GEMINI_API_KEY` Secret 추가
-
-로컬에서 직접 올릴 때:
+로컬에서:
 
 ```bash
-cp .dev.vars.example .dev.vars   # 로컬 Worker 프리뷰용
-npm run preview                  # workerd에서 확인
-npm run deploy                   # wrangler login 후 배포 (--keep-vars)
+npm run pages:build
+npx wrangler pages deploy .open-next --project-name=spritex-ai -c wrangler.pages.jsonc
 ```
 
 ## 라이선스

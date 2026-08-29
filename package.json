@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "pages:build": "opennextjs-cloudflare build && node scripts/prepare-cloudflare-pages.mjs",
+    "pages:deploy": "npm run pages:build && wrangler pages deploy .open-next --project-name=spritex-ai -c wrangler.pages.jsonc",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy -- --keep-vars",
     "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload -- --keep-vars",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv --include-runtime false cloudflare-env.d.ts",
